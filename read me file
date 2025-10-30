@@ -1,0 +1,14 @@
+# 🧠 Sentiment Analyzer Dashboard
+
+A web app built with **Streamlit**, **Hugging Face Transformers**, and **TextBlob** for real-time sentiment analysis.
+
+### Features
+- Analyze individual text or CSV files
+- Choose between TextBlob or Transformer models
+- Visualize sentiment distribution
+- Download analyzed results as CSV
+
+### Run locally
+```bash
+pip install -r requirements.txt
+streamlit run app.py
