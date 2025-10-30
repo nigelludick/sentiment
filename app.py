@@ -1,19 +1,34 @@
+# app.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from textblob import TextBlob
 from transformers import pipeline
-from typing import List
+from wordcloud import WordCloud
 import math
 import time
+import numpy as np
 
-st.set_page_config(page_title="Sentiment Analyzer (HF + TextBlob)", layout="wide")
-st.title("🧠 Sentiment Analyzer Dashboard — Transformers + TextBlob")
+# --- Page config and styling ---
+st.set_page_config(page_title="Sentiment Analyzer Dashboard", layout="wide")
+st.markdown(
+    """
+    <style>
+    body { background-color: #0E1117; color: #E5E5E5; }
+    .stSidebar { background-color: #0E1117; color: #00FF00; }
+    h1, h2, h3 { color: #00FF00; }
+    </style>
+    """, unsafe_allow_html=True
+)
+st.title("🧠 Sentiment Analyzer Dashboard")
+st.markdown("*Analyze emotions, visualize insights, and explore text trends.*")
 
+# --- Model loader (cached) ---
 @st.cache_resource
-def load_hf_pipeline(model_name: str = "distilbert-base-uncased-finetuned-sst-2-english"):
+def load_hf_pipeline(model_name="distilbert-base-uncased-finetuned-sst-2-english"):
     return pipeline("sentiment-analysis", model=model_name, device=-1)
 
+# --- Sidebar settings ---
 st.sidebar.header("Settings")
 model_choice = st.sidebar.selectbox("Choose sentiment engine", ["Hugging Face (transformers)", "TextBlob (simple)"])
 hf_model_name = st.sidebar.text_input("HF model name", value="distilbert-base-uncased-finetuned-sst-2-english")
@@ -24,10 +39,11 @@ if model_choice.startswith("Hugging"):
         hf_pipeline = load_hf_pipeline(hf_model_name)
     st.sidebar.success(f"Loaded: {hf_model_name}")
 
+# --- Single text analysis ---
 st.subheader("🔹 Single Text Analysis")
 text_input = st.text_area("Enter text to analyze", value="I love Streamlit — it's super easy to use!")
 
-def analyze_single(text: str):
+def analyze_single(text):
     if model_choice.startswith("Hugging"):
         out = hf_pipeline(text[:1000])[0]
         label = out["label"]
@@ -37,12 +53,7 @@ def analyze_single(text: str):
     else:
         blob = TextBlob(text)
         polarity = blob.sentiment.polarity
-        if polarity > 0:
-            label = "POSITIVE"
-        elif polarity < 0:
-            label = "NEGATIVE"
-        else:
-            label = "NEUTRAL"
+        label = "POSITIVE" if polarity > 0 else ("NEGATIVE" if polarity < 0 else "NEUTRAL")
         return {"label": label, "score": abs(polarity), "polarity": polarity}
 
 if st.button("Analyze Text"):
@@ -58,6 +69,7 @@ if st.button("Analyze Text"):
             st.info(f"😐 Neutral — Score: {result['score']:.3f}")
         st.write(result)
 
+# --- CSV upload / batch analysis ---
 st.subheader("📁 Batch Sentiment Analysis (CSV)")
 st.markdown("Upload a CSV with a column named `text`.")
 
@@ -103,15 +115,51 @@ if uploaded_file is not None:
             st.write("### 🎯 Results")
             st.dataframe(out_df)
 
-            st.write("### 📊 Sentiment Distribution")
-            counts = out_df["label"].value_counts()
-            fig, ax = plt.subplots()
-            ax.pie(counts, labels=counts.index, autopct="%1.1f%%", startangle=90)
-            ax.axis("equal")
-            st.pyplot(fig)
+            # --- Side-by-side layout ---
+            col1, col2 = st.columns(2)
 
+            # Left: Sentiment Pie Chart
+            with col1:
+                st.write("### 📊 Sentiment Distribution")
+                counts = out_df["label"].value_counts()
+                fig, ax = plt.subplots()
+                ax.pie(counts, labels=counts.index, autopct="%1.1f%%", startangle=90)
+                ax.axis("equal")
+                st.pyplot(fig)
+
+            # Right: Sentiment-aware Word Cloud
+            with col2:
+                st.write("### ☁️ Sentiment Word Cloud")
+                word_scores = {}
+                for text, polarity in zip(out_df["text"].astype(str), out_df["polarity"]):
+                    for word in text.split():
+                        word = word.lower()
+                        if word not in word_scores:
+                            word_scores[word] = []
+                        word_scores[word].append(polarity)
+                word_avg = {w: np.mean(scores) for w, scores in word_scores.items()}
+
+                def sentiment_color(word, **kwargs):
+                    score = word_avg.get(word.lower(), 0)
+                    if score > 0.05:
+                        return "green"
+                    elif score < -0.05:
+                        return "red"
+                    else:
+                        return "grey"
+
+                all_text = " ".join(out_df["text"].astype(str))
+                wc = WordCloud(width=400, height=300, background_color="black",
+                               color_func=sentiment_color).generate(all_text)
+                fig2, ax2 = plt.subplots()
+                ax2.imshow(wc, interpolation="bilinear")
+                ax2.axis("off")
+                st.pyplot(fig2)
+
+            # Download CSV
             csv_bytes = out_df.to_csv(index=False).encode("utf-8")
             st.download_button("Download results CSV", csv_bytes, file_name="sentiment_results.csv", mime="text/csv")
 
 st.markdown("---")
-st.markdown("**Tips:** Use the Hugging Face model for better accuracy. For very large datasets, run batch jobs offline.")
+st.markdown("**Powered by Transformers & TextBlob — accuracy may vary by context.**")
+
