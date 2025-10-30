@@ -2,7 +2,7 @@ streamlit
 transformers
 torch
 pandas
-matplotlib
+plotly
 textblob
 wordcloud
 numpy
