@@ -20,7 +20,7 @@ st.markdown(
     </style>
     """, unsafe_allow_html=True
 )
-st.title("🧠 Sentiment Analyzer Dashboard")
+st.title(" Sentiment Analyzer Dashboard")
 st.markdown("*Analyze emotions, visualize insights, and explore text trends.*")
 
 # --- Model loader (cached) ---
